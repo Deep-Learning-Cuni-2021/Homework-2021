@@ -1,0 +1,13 @@
+/.deepnote/
+.idea/
+logs/
+__pycache__/
+venv/
+*.txt
+*.model
+*.npz
+*.zip
+*.iml
+*.xml
+.idea/workspace.xml
+.idea/deep_learning.iml
