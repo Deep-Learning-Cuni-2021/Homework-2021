@@ -53,6 +53,12 @@ def main(args):
     #   from `args.activation`, allowing "none", "relu", "tanh", "sigmoid".
     # - finally, add a final fully connected layer with
     #   `MNIST.LABELS` units and `tf.nn.softmax` activation.
+    model.add(tf.keras.layers.Flatten())
+    for _ in range(args.hidden_layers):
+        if args.activation == "none":
+            model.add(tf.keras.layers.Dense(args.hidden_layer))
+        else: model.add(tf.keras.layers.Dense(args.hidden_layer, args.activation))
+    model.add(tf.keras.layers.Dense(units=MNIST.LABELS, activation=tf.nn.softmax))
 
     model.compile(
         optimizer=tf.optimizers.Adam(),
