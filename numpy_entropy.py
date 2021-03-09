@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
+# Solved in team:
+# a507688b-17c7-11e8-9de3-00505601122b
+# bee39584-17d2-11e8-9de3-00505601122b
+# 1af6e984-1812-11e8-9de3-00505601122b
 import argparse
 
 import numpy as np
@@ -11,7 +15,6 @@ parser.add_argument("--recodex", default=False, action="store_true", help="Evalu
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 def main(args):
-    # TODO: Load data distribution, each line containing a datapoint -- a string.
     dict_data = {}
     with open("numpy_entropy_data.txt", "r") as data:
         for line in data:
@@ -29,34 +32,30 @@ def main(args):
 
     arr_data = arr_data / sum_data
 
-    # TODO: Load model distribution, each line `string \t probability`.
     dict_model = {}
     with open("numpy_entropy_model.txt", "r") as model:
         for line in model:
             line = line.rstrip("\n")
             key, value = line.split()  # Split line into a tuple
             dict_model[key] = float(value)  # Add tuple values to dictionary
-    # TODO: process the line, aggregating using Python data structures
 
-    # TODO: Create a NumPy array containing the model distribution.
     arr_model = np.empty(len(dict_data))
     x = 0
+
     for key in dict_data:
-        arr_model[x] = dict_model.get(key, np.inf)    # using `np.inf` when needed
+        arr_model[x] = dict_model.get(key, 0)
         x += 1
 
-    # TODO: Compute the entropy H(data distribution).
+    zeros = np.nonzero(arr_model == 0)
+
     entropy = -np.sum(arr_data * np.log(arr_data))
 
-    # TODO: Compute cross-entropy H(data distribution, model distribution).
-    # When some data distribution elements are missing in the model distribution,
-    # return `np.inf` (this is done when making model array)
-    crossentropy = -np.sum(arr_data * np.log(arr_model))
-
-    # TODO: Compute KL-divergence D_KL(data distribution, model_distribution)
-    kl_divergence = np.sum(arr_data * np.log(arr_data / arr_model))
-
-    # Return the computed values for ReCodEx to validate
+    if not zeros[0].size == 0:
+        crossentropy = np.inf
+        kl_divergence = np.inf
+    else:
+        crossentropy = -np.sum(arr_data * np.log(arr_model))
+        kl_divergence = -np.sum(arr_data * np.log(arr_model / arr_data))
 
     return entropy, crossentropy, kl_divergence
 
