@@ -26,7 +26,7 @@ def main(args):
         arr_data[x] = dict_data[key]
         sum_data += dict_data[key]
         x += 1
-        
+
     arr_data = arr_data / sum_data
 
     # TODO: Load model distribution, each line `string \t probability`.
@@ -39,25 +39,22 @@ def main(args):
     # TODO: process the line, aggregating using Python data structures
 
     # TODO: Create a NumPy array containing the model distribution.
-    arr_model = np.empty(len(dict_model))
+    arr_model = np.empty(len(dict_data))
     x = 0
-    for key in dict_model:
-        arr_model[x] = dict_model[key]
+    for key in dict_data:
+        arr_model[x] = dict_model.get(key, np.inf)    # using `np.inf` when needed
         x += 1
 
-    # TODO: Compute the entropy H(data distribution). You should not use
-    # manual for/while cycles, but instead use the fact that most NumPy methods
-    # operate on all elements (for example `*` is vector element-wise multiplication).
-    entropy = None
+    # TODO: Compute the entropy H(data distribution).
+    entropy = -np.sum(arr_data * np.log(arr_data))
 
     # TODO: Compute cross-entropy H(data distribution, model distribution).
     # When some data distribution elements are missing in the model distribution,
-    # return `np.inf`.
-    crossentropy = None
+    # return `np.inf` (this is done when making model array)
+    crossentropy = -np.sum(arr_data * np.log(arr_model))
 
-    # TODO: Compute KL-divergence D_KL(data distribution, model_distribution),
-    # again using `np.inf` when needed.
-    kl_divergence = None
+    # TODO: Compute KL-divergence D_KL(data distribution, model_distribution)
+    kl_divergence = np.sum(arr_data * np.log(arr_data / arr_model))
 
     # Return the computed values for ReCodEx to validate
 
