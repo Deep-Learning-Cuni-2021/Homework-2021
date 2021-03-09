@@ -9,7 +9,9 @@ import numpy as np
 import tensorflow as tf
 
 from mnist import MNIST
-
+#a507688b-17c7-11e8-9de3-00505601122b
+#bee39584-17d2-11e8-9de3-00505601122b
+#1af6e984-1812-11e8-9de3-00505601122b
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
 parser.add_argument("--activation", default="none", type=str, help="Activation function.")
@@ -53,6 +55,12 @@ def main(args):
     #   from `args.activation`, allowing "none", "relu", "tanh", "sigmoid".
     # - finally, add a final fully connected layer with
     #   `MNIST.LABELS` units and `tf.nn.softmax` activation.
+    model.add(tf.keras.layers.Flatten())
+    for _ in range(args.hidden_layers):
+        if args.activation == "none":
+            model.add(tf.keras.layers.Dense(args.hidden_layer))
+        else: model.add(tf.keras.layers.Dense(args.hidden_layer, args.activation))
+    model.add(tf.keras.layers.Dense(units=MNIST.LABELS, activation=tf.nn.softmax))
 
     model.compile(
         optimizer=tf.optimizers.Adam(),
