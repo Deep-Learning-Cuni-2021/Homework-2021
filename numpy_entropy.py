@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
+# Solved in team:
+# a507688b-17c7-11e8-9de3-00505601122b
+# bee39584-17d2-11e8-9de3-00505601122b
+# 1af6e984-1812-11e8-9de3-00505601122b
 import argparse
 
 import numpy as np
@@ -6,45 +10,55 @@ import numpy as np
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
+
+
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 def main(args):
-    # TODO: Load data distribution, each line containing a datapoint -- a string.
+    dict_data = {}
     with open("numpy_entropy_data.txt", "r") as data:
         for line in data:
             line = line.rstrip("\n")
-            # TODO: Process the line, aggregating data with built-in Python
-            # data structures (not NumPy, which is not suitable for incremental
-            # addition and string mapping).
+            dict_data[line] = dict_data.get(line, 0) + 1
 
-    # TODO: Create a NumPy array containing the data distribution. The
-    # NumPy array should contain only data, not any mapping. Alternatively,
-    # the NumPy array might be created after loading the model distribution.
+    arr_data = np.empty(len(dict_data))
+    sum_data = 0
+    x = 0
 
-    # TODO: Load model distribution, each line `string \t probability`.
+    for key in dict_data:
+        arr_data[x] = dict_data[key]
+        sum_data += dict_data[key]
+        x += 1
+
+    arr_data = arr_data / sum_data
+
+    dict_model = {}
     with open("numpy_entropy_model.txt", "r") as model:
         for line in model:
             line = line.rstrip("\n")
-            # TODO: process the line, aggregating using Python data structures
+            key, value = line.split()  # Split line into a tuple
+            dict_model[key] = float(value)  # Add tuple values to dictionary
 
-    # TODO: Create a NumPy array containing the model distribution.
+    arr_model = np.empty(len(dict_data))
+    x = 0
 
-    # TODO: Compute the entropy H(data distribution). You should not use
-    # manual for/while cycles, but instead use the fact that most NumPy methods
-    # operate on all elements (for example `*` is vector element-wise multiplication).
-    entropy = None
+    for key in dict_data:
+        arr_model[x] = dict_model.get(key, 0)
+        x += 1
 
-    # TODO: Compute cross-entropy H(data distribution, model distribution).
-    # When some data distribution elements are missing in the model distribution,
-    # return `np.inf`.
-    crossentropy = None
+    zeros = np.nonzero(arr_model == 0)
 
-    # TODO: Compute KL-divergence D_KL(data distribution, model_distribution),
-    # again using `np.inf` when needed.
-    kl_divergence = None
+    entropy = -np.sum(arr_data * np.log(arr_data))
 
-    # Return the computed values for ReCodEx to validate
+    if not zeros[0].size == 0:
+        crossentropy = np.inf
+        kl_divergence = np.inf
+    else:
+        crossentropy = -np.sum(arr_data * np.log(arr_model))
+        kl_divergence = -np.sum(arr_data * np.log(arr_model / arr_data))
+
     return entropy, crossentropy, kl_divergence
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
