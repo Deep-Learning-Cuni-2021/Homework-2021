@@ -13,10 +13,10 @@ from mnist import MNIST
 
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
-parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
+parser.add_argument("--batch_size", default=100, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
-parser.add_argument("--hidden_layer", default=100, type=int, help="Size of the hidden layer.")
-parser.add_argument("--learning_rate", default=0.1, type=float, help="Learning rate.")
+parser.add_argument("--hidden_layer", default=32, type=int, help="Size of the hidden layer.")
+parser.add_argument("--learning_rate", default=0.2, type=float, help="Learning rate.")
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
@@ -45,9 +45,9 @@ class Model(tf.Module):
         # - apply `tf.nn.tanh`
         # - multiply the result by `self._W2` and then add `self._b2`
         # - finally apply `tf.nn.softmax` and return the result
-        return tf.nn.softmax(
-            tf.nn.tanh(tf.keras.layers.Reshape([inputs.shape[0], -1]) * self._W1 + self._b1) * self._W2 + self._b2
-        )
+        inputs = tf.reshape(inputs, [inputs.shape[0], -1])
+
+        return tf.nn.softmax(tf.nn.tanh(inputs @ self._W1 + self._b1) @ self._W2 + self._b2)
 
     def train_epoch(self, dataset):
         for batch in dataset.batches(self._args.batch_size):
@@ -66,9 +66,8 @@ class Model(tf.Module):
                 # - for every batch example, it is the categorical crossentropy of the
                 #   predicted probabilities and gold batch label
                 # - finally, compute the average across the batch examples
-                crossentropy = -np.sum(probabilities * np.log(batch["labels"]))
-                loss = np.average(crossentropy)
-                # toto je dosť trash
+                crossentropy = tf.keras.losses.categorical_crossentropy(probabilities, tf.one_hot(batch["labels"], depth=10))
+                loss = tf.reduce_mean(crossentropy)
 
             # We create a list of all variables. Note that a `tf.Module` automatically
             # tracks owned variables, so we could also used `self.trainable_variables`
@@ -84,8 +83,7 @@ class Model(tf.Module):
                 # for the variable and computed gradient. You can modify
                 # variable value with `variable.assign` or in this case the more
                 # efficient `variable.assign_sub`.
-                tf.optimizers.SGD(learning_rate=self._args.learning_rate)
-                # nemam šajn
+                variable.assign(variable - self._args.learning_rate * gradient)
 
     def evaluate(self, dataset):
         # Compute the accuracy of the model prediction
@@ -96,7 +94,7 @@ class Model(tf.Module):
 
             # TODO: Evaluate how many batch examples were predicted
             # correctly and increase `correct` variable accordingly.
-            correct += len(np.nonzero(batch["images"] == probabilities))
+            correct += np.sum(np.argmax(probabilities, axis=1) == batch["labels"])
 
         return correct / dataset.size
 
@@ -126,16 +124,16 @@ def main(args):
 
     for epoch in range(args.epochs):
         # TODO: Run the `train_epoch` with `mnist.train` dataset
-        train_epoch(mnist.train)
+        model.train_epoch(dataset=mnist.train)
 
         # TODO: Evaluate the dev data using `evaluate` on `mnist.dev` dataset
-        accuracy = eval(mnist.dev)
+        accuracy = model.evaluate(mnist.dev)
         print("Dev accuracy after epoch {} is {:.2f}".format(epoch + 1, 100 * accuracy), flush=True)
         with writer.as_default():
             tf.summary.scalar("dev/accuracy", 100 * accuracy, step=epoch + 1)
 
     # TODO: Evaluate the test data using `evaluate` on `mnist.test` dataset
-    accuracy = eval(mnist.test)
+    accuracy = model.evaluate(mnist.test)
     print("Test accuracy after epoch {} is {:.2f}".format(epoch + 1, 100 * accuracy), flush=True)
     with writer.as_default():
         tf.summary.scalar("test/accuracy", 100 * accuracy, step=epoch + 1)
