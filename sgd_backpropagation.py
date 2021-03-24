@@ -66,7 +66,7 @@ class Model(tf.Module):
                 # - for every batch example, it is the categorical crossentropy of the
                 #   predicted probabilities and gold batch label
                 # - finally, compute the average across the batch examples
-                crossentropy = tf.keras.losses.categorical_crossentropy(probabilities, tf.one_hot(batch["labels"], depth=10))
+                crossentropy = tf.keras.losses.categorical_crossentropy(tf.one_hot(batch["labels"], depth=10), probabilities)
                 loss = tf.reduce_mean(crossentropy)
 
             # We create a list of all variables. Note that a `tf.Module` automatically
