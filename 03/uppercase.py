@@ -37,7 +37,9 @@ def main(args):
     # Load data
     uppercase_data = UppercaseData(args.window, args.alphabet_size)
 
-    testing = True
+    train = False       # True - train a model
+    testing = False     # True - cropping train data for debugging the whole thing
+
     if testing:
         uppercase_data.train.data["windows"] = uppercase_data.train.data["windows"][0:1000]
         uppercase_data.train.data["labels"] = uppercase_data.train.data["labels"][0:1000]
@@ -67,7 +69,8 @@ def main(args):
             tf.keras.layers.InputLayer(input_shape=[2 * args.window + 1], dtype=tf.int32),
             tf.keras.layers.Lambda(lambda x: tf.one_hot(x, len(uppercase_data.train.alphabet))),
             tf.keras.layers.Flatten(),
-            tf.keras.layers.Dense(units=10, activation=tf.nn.relu),
+            tf.keras.layers.Dense(units=256, activation=tf.nn.relu),
+            tf.keras.layers.Dense(units=128, activation=tf.nn.relu),
             tf.keras.layers.Dense(units=2, activation=tf.nn.softmax),
         ])
         return model
@@ -77,8 +80,6 @@ def main(args):
             loss=tf.losses.SparseCategoricalCrossentropy(),
             metrics=[tf.metrics.SparseCategoricalAccuracy("accuracy")],
         )
-
-    train = False
 
     if train:
         model = create_model()
@@ -107,13 +108,22 @@ def main(args):
             uppercase_data.test.data["windows"], uppercase_data.test.data["labels"], batch_size=args.batch_size,
         )
 
-    exit(3)
     # TODO: Generate correctly capitalized test set.
     # Use `uppercase_data.test.text` as input, capitalize suitable characters,
     # and write the result to predictions_file (which is
     # `uppercase_test.txt` in the `args.logdir` directory).
-    with open(os.path.join(args.logdir, "uppercase_test.txt"), "w", encoding="utf-8") as predictions_file:
-        ...
+
+    predicted = model.predict_classes(uppercase_data.test.data["windows"])
+
+    with open( "uppercase_test.txt", "w", encoding="utf-8") as predictions_file:
+    # with open(os.path.join(args.logdir, "uppercase_test.txt"), "w", encoding="utf-8") as predictions_file:
+        for i in range(uppercase_data.test.size):
+            if predicted[i] == 0:
+               # print("%s" % (char_from_text), end="")
+                print("%s" % (uppercase_data.test.text[i]), end="", file=predictions_file)
+            else:
+               # print("%s" % (char_from_text.upper()), end="")
+                print("%s" % (uppercase_data.test.text[i].upper()), end="", file=predictions_file)
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
