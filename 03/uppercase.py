@@ -13,12 +13,12 @@ from uppercase_data import UppercaseData
 # TODO: Set reasonable values for the hyperparameters, notably
 # for `alphabet_size` and `window` and others.
 parser = argparse.ArgumentParser()
-parser.add_argument("--alphabet_size", default=None, type=int, help="If nonzero, limit alphabet to this many most frequent chars.")
-parser.add_argument("--batch_size", default=None, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=None, type=int, help="Number of epochs.")
+parser.add_argument("--alphabet_size", default=50, type=int, help="If nonzero, limit alphabet to this many most frequent chars.")
+parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=1, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
-parser.add_argument("--window", default=None, type=int, help="Window size to use.")
+parser.add_argument("--window", default=6, type=int, help="Window size to use.")
 
 def main(args):
     # Fix random seeds and threads
@@ -36,6 +36,11 @@ def main(args):
 
     # Load data
     uppercase_data = UppercaseData(args.window, args.alphabet_size)
+
+    testing = True
+    if testing:
+        uppercase_data.train.data["windows"] = uppercase_data.train.data["windows"][0:1000]
+        uppercase_data.train.data["labels"] = uppercase_data.train.data["labels"][0:1000]
 
     # TODO: Implement a suitable model, optionally including regularization, select
     # good hyperparameters and train the model.
@@ -57,8 +62,52 @@ def main(args):
     #   You can then flatten the one-hot encoded windows and follow with a dense layer.
     # - Alternatively, you can use `tf.keras.layers.Embedding` (which is an efficient
     #   implementation of one-hot encoding followed by a Dense layer) and flatten afterwards.
-    model = ...
+    def create_model():
+        model = tf.keras.Sequential([
+            tf.keras.layers.InputLayer(input_shape=[2 * args.window + 1], dtype=tf.int32),
+            tf.keras.layers.Lambda(lambda x: tf.one_hot(x, len(uppercase_data.train.alphabet))),
+            tf.keras.layers.Flatten(),
+            tf.keras.layers.Dense(units=10, activation=tf.nn.relu),
+            tf.keras.layers.Dense(units=2, activation=tf.nn.softmax),
+        ])
+        return model
+    def compile(model):
+        model.compile(
+            optimizer=tf.optimizers.Adam(),
+            loss=tf.losses.SparseCategoricalCrossentropy(),
+            metrics=[tf.metrics.SparseCategoricalAccuracy("accuracy")],
+        )
 
+    train = False
+
+    if train:
+        model = create_model()
+        model.summary()
+        model.compile(
+            optimizer=tf.optimizers.Adam(),
+            loss=tf.losses.SparseCategoricalCrossentropy(),
+            metrics=[tf.metrics.SparseCategoricalAccuracy("accuracy")],
+        )
+
+        model.fit(
+            uppercase_data.train.data["windows"], uppercase_data.train.data["labels"],
+            batch_size=args.batch_size, epochs=args.epochs,
+            validation_data=(uppercase_data.dev.data["windows"], uppercase_data.dev.data["labels"]),
+        )
+
+        model.evaluate(
+            uppercase_data.test.data["windows"], uppercase_data.test.data["labels"], batch_size=args.batch_size,
+        )
+        model.save_weights('models/uppercase_model')
+    else:
+        model = create_model()
+        compile(model)
+        model.load_weights('models/uppercase_model')
+        model.evaluate(
+            uppercase_data.test.data["windows"], uppercase_data.test.data["labels"], batch_size=args.batch_size,
+        )
+
+    exit(3)
     # TODO: Generate correctly capitalized test set.
     # Use `uppercase_data.test.text` as input, capitalize suitable characters,
     # and write the result to predictions_file (which is
