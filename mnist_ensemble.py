@@ -41,18 +41,6 @@ def main(args):
     # Create models
     models = []
 
-    def inputs_for_predict(inputs):
-        inputs = tf.reshape(inputs, [inputs.shape[0], -1])
-        return inputs
-
-    def evaluate_model(model, dataset):
-        # Compute the accuracy of the model prediction
-        correct = 0
-        for batch in dataset.batches(args.batch_size):
-            probabilities = model(batch["images"])
-            correct += np.sum(np.argmax(probabilities, axis=1) == batch["labels"])
-        return correct / dataset.size
-
     for model in range(args.models):
         if args.recodex:
             tf.keras.utils.get_custom_objects()["glorot_uniform"] = tf.initializers.GlorotUniform(
@@ -83,10 +71,6 @@ def main(args):
     individual_accuracies, ensemble_accuracies = [], []
     for model_num in range(args.models):
         # Compute the accuracy on the dev set for the individual `models[model]`.
-
-        # moja funkcia nefunguje :( ale necham ju tu ako poučenie, naštuduj si vždy už dané nástroje než vyrobiš nove
-        # individual_accuracy = evaluate_model(model=models[model_num],
-        #                               dataset=mnist.dev.data)
         individual_accuracy = \
             (models[model_num].evaluate(mnist.dev.data["images"], mnist.dev.data["labels"],
                                         batch_size=args.batch_size))[1]
