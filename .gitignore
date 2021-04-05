@@ -11,3 +11,5 @@ venv/
 *.xml
 .idea/workspace.xml
 .idea/deep_learning.iml
+*.xml
+.idea/workspace.xml
