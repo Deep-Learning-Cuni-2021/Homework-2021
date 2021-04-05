@@ -3,7 +3,14 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+# Solved in team:
+# a507688b-17c7-11e8-9de3-00505601122b
+# bee39584-17d2-11e8-9de3-00505601122b
+# 1af6e984-1812-11e8-9de3-00505601122b
+
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -17,6 +24,8 @@ parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+
+
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 def main(args):
@@ -67,7 +76,9 @@ def main(args):
     # - zoom range of 0.2 (20%),
     # - width shift range and height shift range of 0.1 (10%),
     # - allow horizontal flips
-    train_generator = ...
+    train_generator = tf.keras.preprocessing.image.ImageDataGenerator(rotation_range=20, zoom_range=0.2,
+                                                                      width_shift_range=0.1, height_shift_range=0.1,
+                                                                      horizontal_flip=True)
 
     # TODO: Train using the generator. To augment data, use
     # `train_generator.flow` and specify:
@@ -75,16 +86,19 @@ def main(args):
     # - first 5000 of cifar.train.data["labels"] as target
     # - batch_size of args.batch_size
     # - args.seed as random seed
+
     logs = model.fit(
-        ...,
+        train_generator.flow(x=cifar.train.data["images"][:5000],
+                             y=cifar.train.data["labels"][:5000], batch_size=args.batch_size, seed=args.seed),
         shuffle=False, epochs=args.epochs,
         validation_data=(cifar.dev.data["images"], cifar.dev.data["labels"]),
         callbacks=[tb_callback],
+
     )
 
     # Return dev set accuracy
     return logs.history["val_accuracy"][-1]
 
-if __name__ == "__main__":
-    args = parser.parse_args([] if "__file__" not in globals() else None)
-    main(args)
+    if __name__ == "__main__":
+        args = parser.parse_args([] if "__file__" not in globals() else None)
+        main(args)

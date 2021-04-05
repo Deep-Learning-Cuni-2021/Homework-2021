@@ -3,7 +3,8 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -17,6 +18,8 @@ parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+
+
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 def main(args):
@@ -67,11 +70,12 @@ def main(args):
     # of `from_tensor_slices` -- in our case we want each example to
     # be a pair of `(input_image, target_label)`, so we need to pass
     # a pair `(data["images"], data["labels"])` to `from_tensor_slices`.
-    train = ...
-    dev = ...
+    train = tf.data.Dataset.from_tensor_slices((cifar.train.data["images"], cifar.train.data["labels"]))
+    dev = tf.data.Dataset.from_tensor_slices((cifar.dev.data["images"], cifar.dev.data["labels"]))
 
     # Simple data augmentation
     generator = tf.random.Generator.from_seed(args.seed)
+
     def train_augment(image, label):
         if generator.uniform([]) >= 0.5:
             image = tf.image.flip_left_right(image)
@@ -95,17 +99,19 @@ def main(args):
     #   the last call -- it allows the pipeline to run in parallel with
     #   the training process, dynamically adjusting the number of threads
     #   to fully saturate the training process
-    train = ...
+    train = (((train.take(5000)).shuffle(5000, seed=args.seed)).map(train_augment)).batch(args.batch_size).prefetch(
+        tf.data.AUTOTUNE)
 
     # TODO: Prepare the `dev` pipeline
     # - just use `.batch(args.batch_size)` to generate batches
-    dev = ...
+    dev = dev.batch(args.batch_size)
 
     # Train
     logs = model.fit(train, epochs=args.epochs, validation_data=dev, callbacks=[tb_callback])
 
     # Return dev set accuracy
     return logs.history["val_accuracy"][-1]
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
