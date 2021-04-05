@@ -28,6 +28,7 @@ class Network(tf.keras.Model):
             tf.keras.layers.Input(shape=[MNIST.H, MNIST.W, MNIST.C]),
         )
 
+<<<<<<< HEAD
         # TODO: The model starts by passing each input image through the same
         # subnetwork (with shared weights), which should perform
         # - convolution with 10 filters, 3x3 kernel size, stride 2, "valid" padding, ReLU activation,
@@ -37,11 +38,25 @@ class Network(tf.keras.Model):
         # obtaining a 200-dimensional feature representation of each image.
 
         # TODO: Using the computed representations, it should produce four outputs:
+=======
+        # TODO: The model passes each input image through the same network (with shared weights), performing
+        # - convolution with 10 filters, 3x3 kernel size, stride 2, "valid" padding, ReLU activation
+        # - convolution with 20 filters, 3x3 kernel size, stride 2, "valid" padding, ReLU activation
+        # - flattening layer
+        # - fully connected layer with 200 neurons and ReLU activation
+        # obtaining a 200-dimensional feature representation of each image.
+
+        # TODO: Then, it should produce four outputs:
+>>>>>>> 4d04f8102b5c5ca294d1c57445fbef82e747cf97
         # - first, compute _direct prediction_ whether the first digit is
         #   greater than the second, by
         #   - concatenating the two 200-dimensional image representations,
         #   - processing them using another 200-neuron ReLU dense layer
+<<<<<<< HEAD
         #   - computing one output using a dense layer with `tf.nn.sigmoid` activation
+=======
+        #   - computing one output with `tf.nn.sigmoid` activation
+>>>>>>> 4d04f8102b5c5ca294d1c57445fbef82e747cf97
         # - then, classify the computed representation of the first image using
         #   a densely connected softmax layer into 10 classes;
         # - then, classify the computed representation of the second image using
@@ -67,9 +82,13 @@ class Network(tf.keras.Model):
 
         # TODO: Train the model by computing appropriate losses of
         # direct_prediction, digit_1, digit_2. Regarding metrics, compute
+<<<<<<< HEAD
         # the accuracy of both the direct and indirect predictions; name both
         # metrics "accuracy" (i.e., pass "accuracy" as the first argument of
         # the metric object).
+=======
+        # the accuracy of both the direct and indirect predictions.
+>>>>>>> 4d04f8102b5c5ca294d1c57445fbef82e747cf97
         self.compile(
             optimizer=tf.keras.optimizers.Adam(),
             loss={
