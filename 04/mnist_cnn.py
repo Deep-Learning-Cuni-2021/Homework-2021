@@ -3,7 +3,8 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -13,11 +14,14 @@ from mnist import MNIST
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
 parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
-parser.add_argument("--cnn", default=None, type=str, help="CNN architecture.")
+parser.add_argument("--cnn", default='C-8-3-5-same,CB-8-3-5-valid,R-[CB-8-3-1-same,CB-8-3-1-same],F,H-50', type=str,
+                    help="CNN architecture.")
 parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+
+
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 # The neural network model
@@ -47,9 +51,60 @@ class Network(tf.keras.Model):
         # You can assume the resulting network is valid; it is fine to crash if it is not.
         #
         # Produce the results in variable `hidden`.
-        hidden = ...
+        def create_layer(input, layer):
+            if layer[:2] == 'C-':
+                arguments = layer.split('-')
+                if arguments[4][-1] == ']':
+                    arguments[4] = arguments[4][:-1]
+                return tf.keras.layers.Conv2D(filters=int(arguments[1]), kernel_size=int(arguments[2]),
+                                                strides=(int(arguments[3]), int(arguments[3])), padding=arguments[4],
+                                                activation=tf.keras.activations.relu)(input)
 
-        # Add the final output layer
+            elif layer[:2] == 'CB':
+                arguments = layer.split('-')
+                if arguments[4][-1] == ']':
+                    arguments[4] = arguments[4][:-1]
+                a = tf.keras.layers.Conv2D(filters=int(arguments[1]), kernel_size=int(arguments[2]),
+                                                strides=(int(arguments[3]), int(arguments[3])), padding=arguments[4],
+                                                activation=None, use_bias=False)(input)
+                b = tf.keras.layers.BatchNormalization()(a)
+                return tf.keras.activations.relu(b)
+
+            elif layer[0] == "M":
+                arguments = layer.split("-")
+                return tf.keras.layers.MaxPool2D(pool_size=(int(arguments[1]), int(arguments[1])), strides=int(arguments[2]))(input)
+
+            elif layer[0] == "F":
+                return tf.keras.layers.Flatten()(input)
+
+            elif layer[0] == "H":
+                arguments = layer.split("-")
+                return tf.keras.layers.Dense(units=int(arguments[1]), activation=tf.keras.activations.relu)(input)
+
+            elif layer[0] == "D":
+                arguments = layer.split("-")
+                return tf.keras.layers.Dropout(rate=float(arguments[1]))(input)
+
+        layers_list = re.split(',', args.cnn)
+
+        residual = False
+        hidden = inputs
+        for layer in layers_list:
+            if layer[0] != 'R' and not residual:
+                hidden = create_layer(input=hidden, layer=layer)
+            elif layer[0] == 'R' and not residual:
+                from_where = hidden
+                hidden = create_layer(input=hidden, layer=layer[3:])
+                residual = True
+            elif residual:
+                hidden = create_layer(input=hidden, layer=layer)
+                hidden = tf.keras.layers.Add()([hidden, from_where])
+                residual = False
+
+        #
+        # hidden = ...
+        #
+        # # Add the final output layer
         outputs = tf.keras.layers.Dense(MNIST.LABELS, activation=tf.nn.softmax)(hidden)
 
         super().__init__(inputs=inputs, outputs=outputs)
@@ -58,8 +113,10 @@ class Network(tf.keras.Model):
             loss=tf.losses.SparseCategoricalCrossentropy(),
             metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")],
         )
-        self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, histogram_freq=1, update_freq=100, profile_batch=0)
-        self.tb_callback._close_writers = lambda: None # A hack allowing to keep the writers open.
+        self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, histogram_freq=1, update_freq=100,
+                                                          profile_batch=0)
+        self.tb_callback._close_writers = lambda: None  # A hack allowing to keep the writers open.
+
 
 def main(args):
     # Fix random seeds and threads
@@ -98,6 +155,7 @@ def main(args):
     network.tb_callback.on_epoch_end(args.epochs, {"val_test_" + metric: value for metric, value in test_logs.items()})
 
     return test_logs["accuracy"]
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
