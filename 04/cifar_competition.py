@@ -16,9 +16,9 @@ from cifar10 import CIFAR10
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
+parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+parser.add_argument("--threads", default=10, type=int, help="Maximum number of threads to use.")
 parser.add_argument("--cnn", default='CB-32-3-1-same,CB-32-3-1-same,M-2-2,CB-64-3-1-same,CB-64-3-1-same,M-2-2,CB-128-3-1-same,CB-128-3-1-same,M-2-2,F,H-128', type=str,
                     help="CNN architecture.")
 class Network(tf.keras.Model):
@@ -102,10 +102,16 @@ def main(args):
 
     # Load data
     cifar = CIFAR10()
+
+    train_generator = tf.keras.preprocessing.image.ImageDataGenerator(rotation_range=20, zoom_range=0.2,
+                                                                      width_shift_range=0.1, height_shift_range=0.1,
+                                                                      horizontal_flip=True)
+
     model = Network(args)
     model.summary()
     model.fit(
-        cifar.train.data["images"], cifar.train.data["labels"],
+        train_generator.flow(x=cifar.train.data["images"],
+                             y=cifar.train.data["labels"], batch_size=args.batch_size, seed=args.seed),
         batch_size=args.batch_size, epochs=args.epochs,
         validation_data=(cifar.dev.data["images"], cifar.dev.data["labels"]),
         callbacks=[model.tb_callback],
