@@ -3,7 +3,12 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+# Solved in team:
+# a507688b-17c7-11e8-9de3-00505601122b
+# bee39584-17d2-11e8-9de3-00505601122b
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -17,6 +22,8 @@ parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+
+
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 # The neural network model
@@ -36,6 +43,22 @@ class Network(tf.keras.Model):
         # - fully connected layer with 200 neurons and ReLU activation,
         # obtaining a 200-dimensional feature representation of each image.
 
+        # Create the shared subnetwork
+        input_shared_subnetwork = tf.keras.layers.Input(shape=[MNIST.H, MNIST.W, MNIST.C])
+        convolution_layer_1 = tf.keras.layers.Conv2D(kernel_size=[3, 3], filters=10, strides=2, padding="valid",
+                                                     activation=tf.nn.relu)(input_shared_subnetwork)
+        convolution_layer_2 = tf.keras.layers.Conv2D(kernel_size=[3, 3], filters=20, strides=2, padding="valid",
+                                                     activation=tf.nn.relu)(convolution_layer_1)
+        flattened_layer = tf.keras.layers.Flatten()(convolution_layer_2)
+        connected_layer = tf.keras.layers.Dense(200, activation=tf.nn.relu)(flattened_layer)
+        output_shared_subnetwork = connected_layer
+
+        shared_subnetwork = tf.keras.models.Model(input_shared_subnetwork, output_shared_subnetwork)
+
+        # run two input images trough the subnetwork
+        represent_image1 = shared_subnetwork(images[0])
+        represent_image2 = shared_subnetwork(images[1])
+
         # TODO: Using the computed representations, it should produce four outputs:
         # - first, compute _direct prediction_ whether the first digit is
         #   greater than the second, by
@@ -49,11 +72,31 @@ class Network(tf.keras.Model):
         # - finally, compute _indirect prediction_ whether the first digit
         #   is greater than second, by comparing the predictions from the above
         #   two outputs.
+
+        # compute the direct prediction
+        concatenated_layer = tf.keras.layers.concatenate([represent_image1, represent_image2])
+        dense_layer_1 = tf.keras.layers.Dense(200, activation=tf.nn.relu)(concatenated_layer)
+
+        direct_prediction = tf.keras.layers.Dense(1, activation=tf.nn.sigmoid)(dense_layer_1)
+
+        # create again a shared subnetwork to classify digits
+        input_digit_classification = tf.keras.Input(shape=200)
+        dense_layer_2 = tf.keras.layers.Dense(10, activation=tf.nn.softmax)(input_digit_classification)
+        output_digit_classification = dense_layer_2
+
+        digit_classification = tf.keras.models.Model(input_digit_classification, output_digit_classification)
+
+        # receive two digits and compute indirect prediction
+        digit_1 = digit_classification(represent_image1)
+        digit_2 = digit_classification(represent_image2)
+
+        indirect_prediction = tf.argmax(digit_1, -1) > tf.argmax(digit_2, -1)
+
         outputs = {
-            "direct_prediction": ...,
-            "digit_1": ...,
-            "digit_2": ...,
-            "indirect_prediction": ...,
+            "direct_prediction": direct_prediction,
+            "digit_1": digit_1,
+            "digit_2": digit_2,
+            "indirect_prediction": indirect_prediction,
         }
 
         # Finally, construct the model.
@@ -73,18 +116,19 @@ class Network(tf.keras.Model):
         self.compile(
             optimizer=tf.keras.optimizers.Adam(),
             loss={
-                "direct_prediction": ...,
-                "digit_1": ...,
-                "digit_2": ...,
+                "direct_prediction": tf.losses.BinaryCrossentropy(),
+                "digit_1": tf.losses.SparseCategoricalCrossentropy(),
+                "digit_2": tf.losses.SparseCategoricalCrossentropy(),
             },
             metrics={
-                "direct_prediction": [...],
-                "indirect_prediction": [...],
-            },
+                "direct_prediction": [tf.metrics.BinaryAccuracy(name="accuracy")],
+                "indirect_prediction": [tf.metrics.BinaryAccuracy(name="accuracy")],
+            }
         )
 
-        self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, histogram_freq=1, update_freq=100, profile_batch=0)
-        self.tb_callback._close_writers = lambda: None # A hack allowing to keep the writers open.
+        self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, histogram_freq=1, update_freq=100,
+                                                          profile_batch=0)
+        self.tb_callback._close_writers = lambda: None  # A hack allowing to keep the writers open.
 
     # Create an appropriate dataset using the MNIST data.
     def create_dataset(self, mnist_dataset, args, training=False):
@@ -92,8 +136,11 @@ class Network(tf.keras.Model):
         dataset = tf.data.Dataset.from_tensor_slices((mnist_dataset.data["images"], mnist_dataset.data["labels"]))
 
         # TODO: If `training`, shuffle the data with `buffer_size=10000` and `seed=args.seed`
+        if training:
+            dataset = dataset.shuffle(buffer_size=10000, seed=args.seed)
 
         # TODO: Combine pairs of examples by creating batches of size 2
+        dataset = dataset.batch(batch_size=2)
 
         # TODO: Map pairs of images to elements suitable for our model. Notably,
         # the elements should be pairs `(input, output)`, with
@@ -101,12 +148,21 @@ class Network(tf.keras.Model):
         # - `output` being a dictionary with keys digit_1, digit_2, direct_prediction
         #   and indirect_prediction.
         def create_element(images, labels):
-            ...
+            input = (images[0], images[1])
+            output = {"digit_1": labels[0],
+                      "digit_2": labels[1],
+                      'direct_prediction': labels[0] > labels[1],
+                      'indirect_prediction': labels[0] > labels[1]
+                      }
+            return input, output
+
         dataset = dataset.map(create_element)
 
         # TODO: Create batches of size `args.batch_size`
+        dataset = dataset.batch(batch_size=args.batch_size)
 
         return dataset
+
 
 def main(args):
     # Fix random seeds and threads
@@ -145,6 +201,7 @@ def main(args):
     network.tb_callback.on_epoch_end(args.epochs, {"val_test_" + metric: value for metric, value in test_logs.items()})
 
     return test_logs
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
