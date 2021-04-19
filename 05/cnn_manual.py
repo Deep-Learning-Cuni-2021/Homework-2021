@@ -3,7 +3,8 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -19,6 +20,8 @@ parser.add_argument("--learning_rate", default=0.01, type=float, help="Learning 
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+
+
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 class Convolution:
@@ -31,31 +34,65 @@ class Convolution:
 
         # Here the kernel and bias variables are created
         self._kernel = tf.Variable(
-            tf.initializers.GlorotUniform(seed=42)([self._kernel_size, self._kernel_size, input_shape[2], self._channels]),
+            tf.initializers.GlorotUniform(seed=42)(
+                [self._kernel_size, self._kernel_size, input_shape[2], self._channels]),
             trainable=True)
         self._bias = tf.Variable(tf.initializers.Zeros()([self._channels]), trainable=True)
 
     def forward(self, inputs):
-        # TODO: Compute the forward propagation through the convolution
-        # with `tf.nn.relu` activation and return the result.
-        #
-        # In order for the computation to be reasonably fast, you cannot
-        # manually iterate through the individual pixels, batch examples,
-        # input channels or output channels. However, you can manually
-        # iterate through the kernel size.
-        raise NotImplementedError()
+        batch_num = inputs.shape[0]
+        input_w = inputs.shape[1]
+
+        input_w_cut = input_w - (input_w - self._kernel_size) % self._stride
+
+        # Compute the dimensions of the CONV output volume
+        output_w = int((input_w_cut - self._kernel_size) / self._stride) + 1
+
+        # Initialise output of convolution
+        conv_output = np.zeros([batch_num, output_w, output_w, self._channels])
+
+        # Iterate through kernel size
+        for m in range(self._kernel_size):
+            for n in range(self._kernel_size):
+                maximum_m = input_w_cut - self._kernel_size + m + 1
+                maximum_n = input_w_cut - self._kernel_size + n + 1
+                input_cut = inputs[:, m: maximum_m:self._stride, n:maximum_n:self._stride, :]
+
+                conv_output += np.einsum('aijd,de->aije', input_cut, self._kernel[m, n, :, :])
+
+        bias_blank = np.ones(conv_output.shape)
+        bias_array = np.einsum('aijd,d->aijd', bias_blank, self._bias)
+
+        output_forward_pass = tf.nn.relu(conv_output + bias_array)
+
+        return output_forward_pass
 
     def backward(self, inputs, outputs, outputs_gradient):
-        # TODO: Given the inputs of the layer, outputs of the layer
-        # (computed in forward pass) and the gradient of the loss
-        # with respect to layer outputs, return a list with the
-        # following three elements:
-        # - gradient of the loss with respect to inputs
-        # - list of variables in the layer, e.g.,
-        #     [self._kernel, self._bias]
-        # - list of gradients of the loss with respect to the layer
-        #   variables (in the same order as the previous argument)
-        raise NotImplementedError()
+        input_w = inputs.shape[1]
+        input_w_modified = input_w - (input_w - self._kernel_size) % self._stride
+
+        gradient_inputs = np.zeros(inputs.shape)
+        gradient_kernel = np.zeros(self._kernel.shape)
+
+        gradient_relu = np.sign(outputs)
+        gradient_relu_outputs = np.einsum('aijb,aijb->aijb', gradient_relu, outputs_gradient)
+
+        for m in range(self._kernel_size):
+            for n in range(self._kernel_size):
+                maximum_m = input_w_modified - self._kernel_size + m + 1
+                maximum_n = input_w_modified - self._kernel_size + n + 1
+
+                input_cut = inputs[:, m: maximum_m: self._stride, n:maximum_n:self._stride, :]
+
+                gradient_inputs[:, m: maximum_m: self._stride, n:maximum_n:self._stride, :] += np.einsum(
+                    'aije,de->aijd', gradient_relu_outputs, self._kernel[m, n, :, :])
+
+                gradient_kernel[m, n, :, :] = np.einsum('aije,aijd->de', gradient_relu_outputs, input_cut)
+
+        gradient_bias = np.einsum('aije->e', gradient_relu_outputs)
+
+        return [gradient_inputs, [self._kernel, self._bias], [gradient_kernel, gradient_bias]]
+
 
 class Network:
     def __init__(self, args):
@@ -100,8 +137,11 @@ class Network:
             hidden_gradient, *gradients = tape.gradient(loss, [hidden] + variables)
 
             # Backpropagate the gradient throug the convolutions
-            for convolution, inputs, outputs in reversed(list(zip(self._convolutions, convolution_values[:-1], convolution_values[1:]))):
-                hidden_gradient, convolution_variables, convolution_gradients =convolution.backward(inputs, outputs, hidden_gradient)
+            for convolution, inputs, outputs in reversed(
+                    list(zip(self._convolutions, convolution_values[:-1], convolution_values[1:]))):
+                hidden_gradient, convolution_variables, convolution_gradients = convolution.backward(inputs,
+                                                                                                     outputs,
+                                                                                                     hidden_gradient)
                 variables.extend(convolution_variables)
                 gradients.extend(convolution_gradients)
 
@@ -149,6 +189,7 @@ def main(args):
 
     # Return the test accuracy for ReCodEx to validate.
     return accuracy
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
