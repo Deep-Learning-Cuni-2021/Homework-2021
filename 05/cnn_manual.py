@@ -3,6 +3,9 @@ import argparse
 import datetime
 import os
 import re
+# Solved in team:
+# a507688b-17c7-11e8-9de3-00505601122b
+# bee39584-17d2-11e8-9de3-00505601122b
 
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
